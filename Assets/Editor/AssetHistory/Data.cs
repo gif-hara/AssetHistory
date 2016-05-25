@@ -25,13 +25,13 @@ namespace AssetHistory
 	[System.Serializable]
 	public class AccessCount
 	{
-		public string path;
+		public string guid;
 
 		public int accessCount;
 
 		public AccessCount(string path)
 		{
-			this.path = path;
+			this.guid = path;
 			this.accessCount = 1;
 		}
 	}

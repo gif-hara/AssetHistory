@@ -16,9 +16,9 @@ namespace AssetHistory
 	{
 		private static Data data;
 
-		private static Vector2 scrollPosition = new Vector2();
+        private static bool allFilter;
 
-        private static bool filterToggle = false;
+		private static Vector2 historyScrollPosition = new Vector2();
 
         private static AnimBool filterAnimation = new AnimBool();
 
@@ -34,26 +34,98 @@ namespace AssetHistory
 
 		void OnGUI()
 		{
-			if(data == null)
-			{
-				var loadObject = UnityEditorInternal.InternalEditorUtility.LoadSerializedFileAndForget(FileDirectory + FileName);
-				if(loadObject.Length > 0)
-				{
-					data = loadObject[0] as Data;
-				}
-				else
-				{
-					data = ScriptableObject.CreateInstance<Data>();
-					Save();
-				}
-			}
+            LoadData();
 
+            DrawHeader();
             DrawHistory();
+            DrawFilter();
+            DrawFooter();
+		}
 
+		void OnInspectorUpdate()
+		{
+			this.Repaint();
+		}
+
+        private void LoadData()
+        {
+            if( data != null )
+            {
+                return;
+            }
+
+            var loadObject = UnityEditorInternal.InternalEditorUtility.LoadSerializedFileAndForget( FileDirectory + FileName );
+            if( loadObject.Length > 0 )
+            {
+                data = loadObject[0] as Data;
+            }
+            else
+            {
+                data = ScriptableObject.CreateInstance<Data>();
+                Save();
+            }
+        }
+
+        private void DrawHeader()
+        {
+            if( data.mode == Mode.History )
+            {
+                EditorGUILayout.PrefixLabel( "History" );
+            }
+            else if( data.mode == Mode.AccessCount )
+            {
+                EditorGUILayout.PrefixLabel( "AccessCount" );
+            }
+        }
+
+        private void DrawHistory()
+        {
+            historyScrollPosition = EditorGUILayout.BeginScrollView( historyScrollPosition );
+            if( data.mode == Mode.History )
+			{
+                data.guids.ForEach( g =>
+				{
+                    var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( g ), typeof( UnityEngine.Object ) );
+                    if( data.filters.Find( f => f.name == obj.GetType().Name ).valid )
+                    {
+                        EditorGUILayout.ObjectField( obj, typeof( UnityEngine.Object ), false );
+                    }
+				});
+            }
+			else if(data.mode == Mode.AccessCount)
+			{
+                data.accessCounts.ForEach( a =>
+				{
+                    var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( a.guid ), typeof( UnityEngine.Object ) );
+                    if( data.filters.Find( f => f.name == obj.GetType().Name ).valid )
+                    {
+                        EditorGUILayout.BeginHorizontal();
+                        EditorGUILayout.ObjectField( obj, typeof( UnityEngine.Object ), false );
+                        EditorGUILayout.LabelField( a.accessCount.ToString(), GUILayout.Width( 20 ) );
+                        EditorGUILayout.EndHorizontal();
+                    }
+				});
+            }
+            EditorGUILayout.EndScrollView();
+        }
+
+        private void DrawFilter()
+        {
             filterAnimation.target = EditorGUILayout.Foldout( filterAnimation.target, "Filter" );
             if( EditorGUILayout.BeginFadeGroup( filterAnimation.faded ) )
             {
-                for(var i=0; i<data.filters.Count; i++)
+                EditorGUI.indentLevel++;
+                var oldAllFilter = allFilter;
+                allFilter = EditorGUILayout.ToggleLeft( "All", allFilter );
+                if( oldAllFilter != allFilter )
+                {
+                    for( var i = 0; i < data.filters.Count; i++ )
+                    {
+                        data.filters[i].valid = allFilter;
+                    }
+                    Save();
+                }
+                for( var i = 0; i < data.filters.Count; i++ )
                 {
                     var oldValid = data.filters[i].valid;
                     data.filters[i].valid = EditorGUILayout.ToggleLeft( data.filters[i].name, data.filters[i].valid );
@@ -62,9 +134,13 @@ namespace AssetHistory
                         Save();
                     }
                 }
+                EditorGUI.indentLevel--;
             }
             EditorGUILayout.EndFadeGroup();
+        }
 
+        private void DrawFooter()
+        {
             EditorGUILayout.BeginHorizontal();
             if( GUILayout.Button( "History" ) )
             {
@@ -85,44 +161,6 @@ namespace AssetHistory
                 }
             }
             EditorGUILayout.EndHorizontal();
-		}
-
-		void OnInspectorUpdate()
-		{
-			this.Repaint();
-		}
-
-        private void DrawHistory()
-        {
-			if(data.mode == Mode.History)
-			{
-				scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
-				data.guids.ForEach( g =>
-				{
-                    var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( g ), typeof( UnityEngine.Object ) );
-                    var filter = data.filters.Find( f => f.name == obj.GetType().Name );
-                    if( filter == null || filter.valid )
-                    {
-                        EditorGUILayout.ObjectField( obj, typeof( UnityEngine.Object ), false );
-                    }
-				});
-				EditorGUILayout.EndScrollView();
-			}
-			else if(data.mode == Mode.AccessCount)
-			{
-				scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
-				data.accessCounts.ForEach( a =>
-				{
-                    if( data.filters.Find( f => f.name == a.GetType().Name ).valid )
-                    {
-                        EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.ObjectField( AssetDatabase.LoadAssetAtPath( a.path, typeof( UnityEngine.Object ) ), typeof( UnityEngine.Object ), false );
-                        EditorGUILayout.LabelField( a.accessCount.ToString(), GUILayout.Width( 20 ) );
-                        EditorGUILayout.EndHorizontal();
-                    }
-				});
-				EditorGUILayout.EndScrollView();
-			}
         }
 
 		[InitializeOnLoadMethod()]
@@ -141,13 +179,16 @@ namespace AssetHistory
 
 		private static void OnChangeSelected()
 		{
-			System.Array.ForEach(Selection.objects, o =>
+            data.guids.RemoveAll( g => AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( g ), typeof( UnityEngine.Object ) ) == null );
+            data.accessCounts.RemoveAll( a => AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( a.guid ), typeof( UnityEngine.Object ) ) == null );
+            System.Array.ForEach( Selection.objects, o =>
 			{
 				if(CanInsert(o))
 				{
 					var guid = AssetDatabase.AssetPathToGUID( AssetDatabase.GetAssetPath(o) );
 					data.guids.Insert(0, guid);
-					var accessCount = data.accessCounts.Find(a => a.path == guid);
+
+					var accessCount = data.accessCounts.Find(a => a.guid == guid);
 					if(accessCount != null)
 					{
 						accessCount.accessCount++;
@@ -162,6 +203,7 @@ namespace AssetHistory
                     if( data.filters.FindIndex( s => s.name == typeName ) < 0 )
                     {
                         data.filters.Add( new Filter( typeName ) );
+                        data.filters.Sort( ( a, b ) => a.name.CompareTo( b.name ) );
                     }
 				}
 			});
@@ -174,7 +216,7 @@ namespace AssetHistory
 					return compare;
 				}
 
-				return AssetDatabase.AssetPathToGUID(a.path).CompareTo(AssetDatabase.AssetPathToGUID(b.path));
+				return a.guid.CompareTo(b.guid);
 			});
 
 			Save();
