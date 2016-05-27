@@ -80,6 +80,8 @@ namespace AssetHistory
                 data = ScriptableObject.CreateInstance<Data>();
                 Save();
             }
+
+			data.Load();
         }
 
         private void DrawHeader()
@@ -137,6 +139,27 @@ namespace AssetHistory
 					if( CurrentData.filters.Find( f => f.name == obj.GetType().Name ).valid )
 					{
 						DrawContent(obj);
+					}
+				});
+			}
+			else if(CurrentData.mode == Mode.Category)
+			{
+				CurrentData.category.ForEach( c =>
+				{
+					if( CurrentData.filters.Find( f => f.name == c.filterName ).valid )
+					{
+						c.animBool.target = EditorGUILayout.Foldout( c.animBool.target, c.filterName );
+						if( EditorGUILayout.BeginFadeGroup( c.animBool.faded ) )
+						{
+							EditorGUI.indentLevel++;
+							c.guids.ForEach(g =>
+							{
+								var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( g ), typeof( UnityEngine.Object ) );
+									DrawContent(obj);
+							});
+							EditorGUI.indentLevel--;
+						}
+						EditorGUILayout.EndFadeGroup();
 					}
 				});
 			}
@@ -221,6 +244,35 @@ namespace AssetHistory
 				}
 				EditorGUILayout.EndHorizontal();
 
+				EditorGUILayout.LabelField("Recommend style");
+				EditorGUILayout.BeginHorizontal();
+				EditorGUILayout.LabelField(" ", GUILayout.Width(115));
+				if(GUILayout.Button("Standard"))
+				{
+					CurrentData.iconSize = 13;
+					CurrentData.historyStyle = Style.ObjectField;
+					Save();
+				}
+				if(GUILayout.Button("Label"))
+				{
+					CurrentData.iconSize = 13;
+					CurrentData.historyStyle = Style.Label;
+					Save();
+				}
+				if(GUILayout.Button("Flat"))
+				{
+					CurrentData.iconSize = 0;
+					CurrentData.historyStyle = Style.BoldLabel;
+					Save();
+				}
+				if(GUILayout.Button("Flat Label"))
+				{
+					CurrentData.iconSize = 0;
+					CurrentData.historyStyle = Style.Label;
+					Save();
+				}
+				EditorGUILayout.EndHorizontal();
+
 				EditorGUILayout.BeginHorizontal();
 				GUILayout.FlexibleSpace();
 				if(GUILayout.Button("Delete", GUILayout.Width(50)))
@@ -258,7 +310,7 @@ namespace AssetHistory
 			optionAnimation.valueChanged.AddListener( RepaintCurrentWindow );
 		}
 
-        private static void RepaintCurrentWindow()
+		public static void RepaintCurrentWindow()
         {
             EditorWindow.GetWindow<AssetHistoryEditorWindow>().Repaint();
         }
@@ -272,6 +324,7 @@ namespace AssetHistory
 				if(CanInsert(o))
 				{
 					var guid = AssetDatabase.AssetPathToGUID( AssetDatabase.GetAssetPath(o) );
+					var typeName = o.GetType().Name;
 					CurrentData.guids.Insert(0, guid);
 
 					var accessCount = CurrentData.accessCounts.Find(a => a.guid == guid);
@@ -292,7 +345,31 @@ namespace AssetHistory
 					}
 					CurrentData.recently.Insert(0, guid);
 
-                    var typeName = o.GetType().Name;
+					var category = CurrentData.category.Find(c => c.filterName == typeName);
+					if(category == null)
+					{
+						category = new Category(typeName);
+						CurrentData.category.Add(category);
+						CurrentData.category.Sort((a, b) =>a.filterName.CompareTo(b.filterName));
+					}
+					if(category.guids.FindIndex(g => g == guid) == -1)
+					{
+						category.guids.Add(guid);
+					}
+					category.guids.Sort((a, b) =>
+					{
+						var a_fileName = AssetDatabase.LoadAssetAtPath(AssetDatabase.GUIDToAssetPath(a), typeof(UnityEngine.Object)).name;
+						var b_fileName = AssetDatabase.LoadAssetAtPath(AssetDatabase.GUIDToAssetPath(b), typeof(UnityEngine.Object)).name;
+						var compare = a_fileName.CompareTo(b_fileName);
+						if(compare != 0)
+						{
+							return compare;
+						}
+
+						return a.CompareTo(b);
+					});
+						
+
                     if( CurrentData.filters.FindIndex( s => s.name == typeName ) < 0 )
                     {
                         CurrentData.filters.Add( new Filter( typeName ) );
