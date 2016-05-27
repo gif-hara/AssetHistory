@@ -21,7 +21,7 @@ namespace AssetHistory
 	public enum Mode : int
 	{
 		History,
-		AccessCount,
+		Access,
 		Recently,
 	}
 

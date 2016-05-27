@@ -41,7 +41,6 @@ namespace AssetHistory
             DrawHeader();
             DrawHistory();
             DrawFilter();
-            DrawFooter();
 		}
 
 		void OnInspectorUpdate()
@@ -70,18 +69,17 @@ namespace AssetHistory
 
         private void DrawHeader()
         {
-            if( data.mode == Mode.History )
-            {
-                EditorGUILayout.PrefixLabel( "History" );
-            }
-			else if( data.mode == Mode.AccessCount )
+			EditorGUILayout.BeginHorizontal();
+			var enumNames = System.Enum.GetNames(typeof(Mode));
+			for(int i=0; i<enumNames.Length; i++)
 			{
-				EditorGUILayout.PrefixLabel( "AccessCount" );
+				if( GUILayout.Toggle( data.mode == (Mode)i, enumNames[i], EditorStyles.toolbarButton ) )
+				{
+					data.mode = (Mode)i;
+					Save();
+				}
 			}
-			else if( data.mode == Mode.Recently )
-			{
-				EditorGUILayout.PrefixLabel( "Recently" );
-			}
+			EditorGUILayout.EndHorizontal();
         }
 
         private void DrawHistory()
@@ -98,7 +96,7 @@ namespace AssetHistory
                     }
 				});
             }
-			else if(data.mode == Mode.AccessCount)
+			else if(data.mode == Mode.Access)
 			{
                 data.accessCounts.ForEach( a =>
 				{
@@ -146,7 +144,7 @@ namespace AssetHistory
                 for( var i = 0; i < data.filters.Count; i++ )
                 {
                     var oldValid = data.filters[i].valid;
-                    data.filters[i].valid = EditorGUILayout.ToggleLeft( data.filters[i].name, data.filters[i].valid );
+					data.filters[i].valid = EditorGUILayout.ToggleLeft( data.filters[i].name, data.filters[i].valid );
                     if( oldValid != data.filters[i].valid )
                     {
                         Save();
@@ -156,35 +154,6 @@ namespace AssetHistory
 				EditorGUILayout.EndScrollView();
             }
             EditorGUILayout.EndFadeGroup();
-        }
-
-        private void DrawFooter()
-        {
-            EditorGUILayout.BeginHorizontal();
-            if( GUILayout.Button( "History" ) )
-            {
-                data.mode = Mode.History;
-                Save();
-            }
-			if( GUILayout.Button( "Access" ) )
-			{
-				data.mode = Mode.AccessCount;
-				Save();
-			}
-			if( GUILayout.Button( "Recently" ) )
-			{
-				data.mode = Mode.Recently;
-				Save();
-			}
-			if( GUILayout.Button( "X", GUILayout.Width(20) ) )
-            {
-				if( EditorUtility.DisplayDialog( "AssetHistory", string.Format("履歴を削除します。{0}本当によろしいですか？", System.Environment.NewLine), "Yes", "No" ) )
-                {
-                    data = null;
-                    Save();
-                }
-            }
-            EditorGUILayout.EndHorizontal();
         }
 
 		[InitializeOnLoadMethod()]
