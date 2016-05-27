@@ -14,15 +14,29 @@ namespace AssetHistory
 	/// </summary>
 	public class AssetHistoryEditorWindow : EditorWindow
 	{
+		public static Data CurrentData
+		{
+			get
+			{
+				if(data == null)
+				{
+					LoadData();
+				}
+
+				return data;
+			}
+		}
 		private static Data data;
 
-        private static bool allFilter;
+        private static bool allFilter = true;
 
 		private static Vector2 historyScrollPosition = new Vector2();
 
 		private static Vector2 filterScrollPosition = new Vector2();
 
         private static AnimBool filterAnimation = new AnimBool();
+
+		private static AnimBool optionAnimation = new AnimBool();
 
 		private const string FileDirectory = "AssetHistory";
 
@@ -41,6 +55,7 @@ namespace AssetHistory
             DrawHeader();
             DrawHistory();
             DrawFilter();
+			DrawOption();
 		}
 
 		void OnInspectorUpdate()
@@ -73,9 +88,9 @@ namespace AssetHistory
 			var enumNames = System.Enum.GetNames(typeof(Mode));
 			for(int i=0; i<enumNames.Length; i++)
 			{
-				if( GUILayout.Toggle( data.mode == (Mode)i, enumNames[i], EditorStyles.toolbarButton ) )
+				if( GUILayout.Toggle( CurrentData.mode == (Mode)i, enumNames[i], EditorStyles.toolbarButton ) )
 				{
-					data.mode = (Mode)i;
+					CurrentData.mode = (Mode)i;
 					Save();
 				}
 			}
@@ -84,68 +99,75 @@ namespace AssetHistory
 
         private void DrawHistory()
         {
+			var iconSize = EditorGUIUtility.GetIconSize();
+			EditorGUIUtility.SetIconSize(Vector2.one * CurrentData.iconSize);
+
+			EditorGUILayout.BeginVertical("box");
             historyScrollPosition = EditorGUILayout.BeginScrollView( historyScrollPosition );
-            if( data.mode == Mode.History )
+            if( CurrentData.mode == Mode.History )
 			{
-                data.guids.ForEach( g =>
+                CurrentData.guids.ForEach( g =>
 				{
                     var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( g ), typeof( UnityEngine.Object ) );
-                    if( data.filters.Find( f => f.name == obj.GetType().Name ).valid )
+                    if( CurrentData.filters.Find( f => f.name == obj.GetType().Name ).valid )
                     {
-                        EditorGUILayout.ObjectField( obj, typeof( UnityEngine.Object ), false );
+						DrawContent(obj);
                     }
 				});
             }
-			else if(data.mode == Mode.Access)
+			else if(CurrentData.mode == Mode.Access)
 			{
-                data.accessCounts.ForEach( a =>
+                CurrentData.accessCounts.ForEach( a =>
 				{
                     var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( a.guid ), typeof( UnityEngine.Object ) );
-                    if( data.filters.Find( f => f.name == obj.GetType().Name ).valid )
+                    if( CurrentData.filters.Find( f => f.name == obj.GetType().Name ).valid )
                     {
                         EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.ObjectField( obj, typeof( UnityEngine.Object ), false );
-                        EditorGUILayout.LabelField( a.accessCount.ToString(), GUILayout.Width( 20 ) );
+						GUILayout.Label( string.Format("{0}", a.accessCount), GUILayout.Width( 36 ) );
+						DrawContent(obj);
                         EditorGUILayout.EndHorizontal();
                     }
 				});
             }
-			else if(data.mode == Mode.Recently)
+			else if(CurrentData.mode == Mode.Recently)
 			{
-				data.recently.ForEach( r =>
+				CurrentData.recently.ForEach( r =>
 				{
 					var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( r ), typeof( UnityEngine.Object ) );
-					if( data.filters.Find( f => f.name == obj.GetType().Name ).valid )
+					if( CurrentData.filters.Find( f => f.name == obj.GetType().Name ).valid )
 					{
-						EditorGUILayout.ObjectField( obj, typeof( UnityEngine.Object ), false );
+						DrawContent(obj);
 					}
 				});
 			}
             EditorGUILayout.EndScrollView();
+			EditorGUILayout.EndVertical();
+			EditorGUIUtility.SetIconSize(iconSize);
         }
 
         private void DrawFilter()
         {
+			EditorGUILayout.BeginVertical("box");
             filterAnimation.target = EditorGUILayout.Foldout( filterAnimation.target, "Filter" );
             if( EditorGUILayout.BeginFadeGroup( filterAnimation.faded ) )
             {
-				filterScrollPosition = EditorGUILayout.BeginScrollView(filterScrollPosition, GUILayout.Height(this.position.height / 2));
+				filterScrollPosition = EditorGUILayout.BeginScrollView(filterScrollPosition, GUILayout.Height(this.position.height / 3));
                 EditorGUI.indentLevel++;
                 var oldAllFilter = allFilter;
                 allFilter = EditorGUILayout.ToggleLeft( "All", allFilter );
                 if( oldAllFilter != allFilter )
                 {
-                    for( var i = 0; i < data.filters.Count; i++ )
+                    for( var i = 0; i < CurrentData.filters.Count; i++ )
                     {
-                        data.filters[i].valid = allFilter;
+                        CurrentData.filters[i].valid = allFilter;
                     }
                     Save();
                 }
-                for( var i = 0; i < data.filters.Count; i++ )
+                for( var i = 0; i < CurrentData.filters.Count; i++ )
                 {
-                    var oldValid = data.filters[i].valid;
-					data.filters[i].valid = EditorGUILayout.ToggleLeft( data.filters[i].name, data.filters[i].valid );
-                    if( oldValid != data.filters[i].valid )
+                    var oldValid = CurrentData.filters[i].valid;
+					CurrentData.filters[i].valid = EditorGUILayout.ToggleLeft( CurrentData.filters[i].name, CurrentData.filters[i].valid );
+                    if( oldValid != CurrentData.filters[i].valid )
                     {
                         Save();
                     }
@@ -154,15 +176,86 @@ namespace AssetHistory
 				EditorGUILayout.EndScrollView();
             }
             EditorGUILayout.EndFadeGroup();
+			EditorGUILayout.EndVertical();
         }
+
+		private void DrawOption()
+		{
+			EditorGUILayout.BeginVertical("box");
+			optionAnimation.target = EditorGUILayout.Foldout( optionAnimation.target, "Option" );
+			if( EditorGUILayout.BeginFadeGroup( optionAnimation.faded ) )
+			{
+				EditorGUI.indentLevel++;
+
+				EditorGUILayout.BeginHorizontal();
+				EditorGUILayout.LabelField("Leave history", GUILayout.Width(100));
+				var _historyCount = EditorGUILayout.DelayedIntField(CurrentData.historyCount);
+				if(_historyCount != CurrentData.historyCount)
+				{
+					var message = string.Format("履歴数を{1}から{2}に変更します。{0}小さくした場合は古い履歴が削除されます。{0}本当によろしいですか？", System.Environment.NewLine, CurrentData.historyCount, _historyCount);
+					if(EditorUtility.DisplayDialog("AssetHistory", message, "Yes", "No"))
+					{
+						CurrentData.ChangeHistoryCount(_historyCount);
+						Save();
+					}
+				}
+				EditorGUILayout.EndHorizontal();
+
+				EditorGUILayout.BeginHorizontal();
+				EditorGUILayout.LabelField("Icon size", GUILayout.Width(100));
+				var _iconSize = EditorGUILayout.IntSlider(CurrentData.iconSize, 0, 128);
+				if(_iconSize != CurrentData.iconSize)
+				{
+					CurrentData.iconSize = _iconSize;
+					Save();
+				}
+				EditorGUILayout.EndHorizontal();
+
+				EditorGUILayout.BeginHorizontal();
+				EditorGUILayout.LabelField("Style", GUILayout.Width(100));
+				var _style = (Style)EditorGUILayout.EnumPopup(CurrentData.historyStyle);
+				if(_style != CurrentData.historyStyle)
+				{
+					CurrentData.historyStyle = _style;
+					Save();
+				}
+				EditorGUILayout.EndHorizontal();
+
+				EditorGUILayout.BeginHorizontal();
+				GUILayout.FlexibleSpace();
+				if(GUILayout.Button("Delete", GUILayout.Width(50)))
+				{
+					var message = string.Format("データを全て削除します。{0}本当によろしいですか？", System.Environment.NewLine);
+					if(EditorUtility.DisplayDialog("AssetHistory", message, "Yes", "No"))
+					{
+						CurrentData.Reset();
+						Save();
+					}
+				}
+				EditorGUILayout.EndHorizontal();
+				EditorGUI.indentLevel--;
+			}
+			EditorGUILayout.EndFadeGroup();
+			EditorGUILayout.EndVertical();
+		}
+
+		private void DrawContent(UnityEngine.Object obj)
+		{
+			if(GUILayout.Toggle( obj == Selection.activeObject, GetGUIContent(obj), CurrentData.GetStyle() ))
+			{
+				Selection.activeObject = obj;
+			}
+		}
 
 		[InitializeOnLoadMethod()]
 		private static void InitializeOnLoad()
 		{
 			Selection.selectionChanged -= OnChangeSelected;
 			Selection.selectionChanged += OnChangeSelected;
-            filterAnimation.valueChanged.RemoveListener( RepaintCurrentWindow );
-            filterAnimation.valueChanged.AddListener( RepaintCurrentWindow );
+			filterAnimation.valueChanged.RemoveListener( RepaintCurrentWindow );
+			filterAnimation.valueChanged.AddListener( RepaintCurrentWindow );
+			optionAnimation.valueChanged.RemoveListener( RepaintCurrentWindow );
+			optionAnimation.valueChanged.AddListener( RepaintCurrentWindow );
 		}
 
         private static void RepaintCurrentWindow()
@@ -172,21 +265,16 @@ namespace AssetHistory
 
 		private static void OnChangeSelected()
 		{
-			if(data == null)
-			{
-				LoadData();
-			}
-				
-            data.guids.RemoveAll( g => AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( g ), typeof( UnityEngine.Object ) ) == null );
-            data.accessCounts.RemoveAll( a => AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( a.guid ), typeof( UnityEngine.Object ) ) == null );
+            CurrentData.guids.RemoveAll( g => AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( g ), typeof( UnityEngine.Object ) ) == null );
+            CurrentData.accessCounts.RemoveAll( a => AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( a.guid ), typeof( UnityEngine.Object ) ) == null );
             System.Array.ForEach( Selection.objects, o =>
 			{
 				if(CanInsert(o))
 				{
 					var guid = AssetDatabase.AssetPathToGUID( AssetDatabase.GetAssetPath(o) );
-					data.guids.Insert(0, guid);
+					CurrentData.guids.Insert(0, guid);
 
-					var accessCount = data.accessCounts.Find(a => a.guid == guid);
+					var accessCount = CurrentData.accessCounts.Find(a => a.guid == guid);
 					if(accessCount != null)
 					{
 						accessCount.accessCount++;
@@ -194,26 +282,31 @@ namespace AssetHistory
 					else
 					{
 						accessCount = new AccessCount(guid);
-						data.accessCounts.Add(accessCount);
+						CurrentData.accessCounts.Add(accessCount);
 					}
 
-					var recentlyIndex = data.recently.FindIndex(r => r == guid);
-					if(recentlyIndex > 0)
+					var recentlyIndex = CurrentData.recently.FindIndex(r => r == guid);
+					if(recentlyIndex >= 0)
 					{
-						data.recently.RemoveAt(recentlyIndex);
+						CurrentData.recently.RemoveAt(recentlyIndex);
 					}
-					data.recently.Insert(0, guid);
+					CurrentData.recently.Insert(0, guid);
 
                     var typeName = o.GetType().Name;
-                    if( data.filters.FindIndex( s => s.name == typeName ) < 0 )
+                    if( CurrentData.filters.FindIndex( s => s.name == typeName ) < 0 )
                     {
-                        data.filters.Add( new Filter( typeName ) );
-                        data.filters.Sort( ( a, b ) => a.name.CompareTo( b.name ) );
+                        CurrentData.filters.Add( new Filter( typeName ) );
+                        CurrentData.filters.Sort( ( a, b ) => a.name.CompareTo( b.name ) );
                     }
 				}
 			});
 
-			data.accessCounts.Sort((a, b) =>
+			if(CurrentData.guids.Count > CurrentData.historyCount)
+			{
+				CurrentData.guids = CurrentData.guids.GetRange(0, CurrentData.historyCount);
+			}
+
+			CurrentData.accessCounts.Sort((a, b) =>
 			{
 				var compare = b.accessCount - a.accessCount;
 				if(compare != 0)
@@ -229,13 +322,9 @@ namespace AssetHistory
 
 		private static void Save()
 		{
-			if(data == null)
-			{
-				data = ScriptableObject.CreateInstance<Data>();
-			}
 			Directory.CreateDirectory(FileDirectory);
 			File.Delete(FileDirectory + FileName);
-			UnityEditorInternal.InternalEditorUtility.SaveToSerializedFileAndForget(new UnityEngine.Object[]{data}, FileDirectory + FileName, true);
+			UnityEditorInternal.InternalEditorUtility.SaveToSerializedFileAndForget(new UnityEngine.Object[]{CurrentData}, FileDirectory + FileName, true);
 		}
 
 		private static bool CanInsert(UnityEngine.Object obj)
@@ -247,6 +336,19 @@ namespace AssetHistory
 			}
 			var typeName = obj.GetType().Name;
 			return typeName != "DefaultAsset";
+		}
+
+		private GUIContent GetGUIContent(UnityEngine.Object obj)
+		{
+			if (obj == null)
+			{
+				return new GUIContent();
+			}
+
+			var content = new GUIContent(EditorGUIUtility.ObjectContent(obj, obj.GetType()));
+			content.tooltip = AssetDatabase.GetAssetPath(obj);
+
+			return content;
 		}
 	}
 }

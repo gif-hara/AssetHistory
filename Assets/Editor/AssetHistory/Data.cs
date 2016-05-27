@@ -15,7 +15,67 @@ namespace AssetHistory
 
         public List<Filter> filters = new List<Filter>();
 
-		public Mode mode;
+		public Mode mode = Mode.History;
+
+		public int historyCount = 100;
+
+		public int iconSize = 16;
+
+		public Style historyStyle = Style.Label;
+
+		public void ChangeHistoryCount(int historyCount)
+		{
+			if(this.historyCount > historyCount)
+			{
+				this.guids = this.guids.GetRange(0, historyCount);
+			}
+			this.historyCount = historyCount;
+		}
+
+		public void Reset()
+		{
+			this.guids = new List<string>();
+			this.accessCounts = new List<AccessCount>();
+			this.recently = new List<string>();
+			this.filters = new List<Filter>();
+			this.mode = Mode.History;
+			this.historyCount = 100;
+			this.iconSize = 16;
+			this.historyStyle = Style.Label;
+		}
+
+		public GUIStyle GetStyle()
+		{
+			switch(this.historyStyle)
+			{
+			case Style.Label:
+				return EditorStyles.label;
+			case Style.LargeLabel:
+				return EditorStyles.largeLabel;
+			case Style.MiniLabel:
+				return EditorStyles.miniLabel;
+			case Style.BoldLabel:
+				return EditorStyles.boldLabel;
+			case Style.CenteredGreyMiniLabel:
+				return EditorStyles.centeredGreyMiniLabel;
+			case Style.MiniButton:
+				return EditorStyles.miniButton;
+			case Style.ToolbarButton:
+				return EditorStyles.toolbarButton;
+			case Style.RadioButton:
+				return EditorStyles.radioButton;
+			case Style.Toggle:
+				return EditorStyles.toggle;
+			case Style.ObjectField:
+				return EditorStyles.objectField;
+			case Style.ObjectFieldThumb:
+				return EditorStyles.objectFieldThumb;
+			case Style.HelpBox:
+				return EditorStyles.helpBox;
+			default:
+				return EditorStyles.label;
+			}
+		}
 	}
 
 	public enum Mode : int
@@ -23,6 +83,22 @@ namespace AssetHistory
 		History,
 		Access,
 		Recently,
+	}
+
+	public enum Style : int
+	{
+		Label,
+		LargeLabel,
+		BoldLabel,
+		MiniLabel,
+		CenteredGreyMiniLabel,
+		MiniButton,
+		ToolbarButton,
+		RadioButton,
+		Toggle,
+		ObjectField,
+		ObjectFieldThumb,
+		HelpBox,
 	}
 
 	[System.Serializable]
