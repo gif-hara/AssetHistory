@@ -11,6 +11,8 @@ namespace AssetHistory
 
 		public List<AccessCount> accessCounts = new List<AccessCount>();
 
+		public List<string> recently = new List<string>();
+
         public List<Filter> filters = new List<Filter>();
 
 		public Mode mode;
@@ -20,6 +22,7 @@ namespace AssetHistory
 	{
 		History,
 		AccessCount,
+		Recently,
 	}
 
 	[System.Serializable]

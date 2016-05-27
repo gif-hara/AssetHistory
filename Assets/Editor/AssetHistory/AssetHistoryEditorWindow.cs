@@ -20,6 +20,8 @@ namespace AssetHistory
 
 		private static Vector2 historyScrollPosition = new Vector2();
 
+		private static Vector2 filterScrollPosition = new Vector2();
+
         private static AnimBool filterAnimation = new AnimBool();
 
 		private const string FileDirectory = "AssetHistory";
@@ -47,7 +49,7 @@ namespace AssetHistory
 			this.Repaint();
 		}
 
-        private void LoadData()
+		private static void LoadData()
         {
             if( data != null )
             {
@@ -72,10 +74,14 @@ namespace AssetHistory
             {
                 EditorGUILayout.PrefixLabel( "History" );
             }
-            else if( data.mode == Mode.AccessCount )
-            {
-                EditorGUILayout.PrefixLabel( "AccessCount" );
-            }
+			else if( data.mode == Mode.AccessCount )
+			{
+				EditorGUILayout.PrefixLabel( "AccessCount" );
+			}
+			else if( data.mode == Mode.Recently )
+			{
+				EditorGUILayout.PrefixLabel( "Recently" );
+			}
         }
 
         private void DrawHistory()
@@ -106,6 +112,17 @@ namespace AssetHistory
                     }
 				});
             }
+			else if(data.mode == Mode.Recently)
+			{
+				data.recently.ForEach( r =>
+				{
+					var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( r ), typeof( UnityEngine.Object ) );
+					if( data.filters.Find( f => f.name == obj.GetType().Name ).valid )
+					{
+						EditorGUILayout.ObjectField( obj, typeof( UnityEngine.Object ), false );
+					}
+				});
+			}
             EditorGUILayout.EndScrollView();
         }
 
@@ -114,6 +131,7 @@ namespace AssetHistory
             filterAnimation.target = EditorGUILayout.Foldout( filterAnimation.target, "Filter" );
             if( EditorGUILayout.BeginFadeGroup( filterAnimation.faded ) )
             {
+				filterScrollPosition = EditorGUILayout.BeginScrollView(filterScrollPosition, GUILayout.Height(this.position.height / 2));
                 EditorGUI.indentLevel++;
                 var oldAllFilter = allFilter;
                 allFilter = EditorGUILayout.ToggleLeft( "All", allFilter );
@@ -135,6 +153,7 @@ namespace AssetHistory
                     }
                 }
                 EditorGUI.indentLevel--;
+				EditorGUILayout.EndScrollView();
             }
             EditorGUILayout.EndFadeGroup();
         }
@@ -147,14 +166,19 @@ namespace AssetHistory
                 data.mode = Mode.History;
                 Save();
             }
-            if( GUILayout.Button( "Access" ) )
+			if( GUILayout.Button( "Access" ) )
+			{
+				data.mode = Mode.AccessCount;
+				Save();
+			}
+			if( GUILayout.Button( "Recently" ) )
+			{
+				data.mode = Mode.Recently;
+				Save();
+			}
+			if( GUILayout.Button( "X", GUILayout.Width(20) ) )
             {
-                data.mode = Mode.AccessCount;
-                Save();
-            }
-            if( GUILayout.Button( "Delete" ) )
-            {
-                if( EditorUtility.DisplayDialog( "AssetHistory", "本当に削除しますか？", "Yes", "No" ) )
+				if( EditorUtility.DisplayDialog( "AssetHistory", string.Format("履歴を削除します。{0}本当によろしいですか？", System.Environment.NewLine), "Yes", "No" ) )
                 {
                     data = null;
                     Save();
@@ -179,6 +203,11 @@ namespace AssetHistory
 
 		private static void OnChangeSelected()
 		{
+			if(data == null)
+			{
+				LoadData();
+			}
+				
             data.guids.RemoveAll( g => AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( g ), typeof( UnityEngine.Object ) ) == null );
             data.accessCounts.RemoveAll( a => AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( a.guid ), typeof( UnityEngine.Object ) ) == null );
             System.Array.ForEach( Selection.objects, o =>
@@ -198,6 +227,13 @@ namespace AssetHistory
 						accessCount = new AccessCount(guid);
 						data.accessCounts.Add(accessCount);
 					}
+
+					var recentlyIndex = data.recently.FindIndex(r => r == guid);
+					if(recentlyIndex > 0)
+					{
+						data.recently.RemoveAt(recentlyIndex);
+					}
+					data.recently.Insert(0, guid);
 
                     var typeName = o.GetType().Name;
                     if( data.filters.FindIndex( s => s.name == typeName ) < 0 )
