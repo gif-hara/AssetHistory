@@ -2,6 +2,7 @@
 using UnityEngine.Assertions;
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditor.AnimatedValues;
 
 namespace AssetHistory
 {
@@ -12,6 +13,8 @@ namespace AssetHistory
 		public List<AccessCount> accessCounts = new List<AccessCount>();
 
 		public List<string> recently = new List<string>();
+
+		public List<Category> category = new List<Category>();
 
         public List<Filter> filters = new List<Filter>();
 
@@ -32,11 +35,17 @@ namespace AssetHistory
 			this.historyCount = historyCount;
 		}
 
+		public void Load()
+		{
+			this.category.ForEach(c => c.animBool.valueChanged.AddListener(AssetHistoryEditorWindow.RepaintCurrentWindow));
+		}
+
 		public void Reset()
 		{
 			this.guids = new List<string>();
 			this.accessCounts = new List<AccessCount>();
 			this.recently = new List<string>();
+			this.category = new List<Category>();
 			this.filters = new List<Filter>();
 			this.mode = Mode.History;
 			this.historyCount = 100;
@@ -83,6 +92,7 @@ namespace AssetHistory
 		History,
 		Access,
 		Recently,
+		Category,
 	}
 
 	public enum Style : int
@@ -112,6 +122,24 @@ namespace AssetHistory
 		{
 			this.guid = path;
 			this.accessCount = 1;
+		}
+	}
+
+	[System.Serializable]
+	public class Category
+	{
+		public string filterName;
+
+		public List<string> guids;
+
+		public AnimBool animBool;
+
+		public Category(string filterName)
+		{
+			this.filterName = filterName;
+			this.guids = new List<string>();
+			this.animBool = new AnimBool();
+			this.animBool.valueChanged.AddListener(AssetHistoryEditorWindow.RepaintCurrentWindow);
 		}
 	}
 
