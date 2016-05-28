@@ -6,6 +6,7 @@ using System.Linq;
 using System;
 using System.IO;
 using UnityEditor.AnimatedValues;
+using System.Collections.ObjectModel;
 
 namespace AssetHistory
 {
@@ -41,6 +42,15 @@ namespace AssetHistory
 		private const string FileDirectory = "AssetHistory";
 
 		private const string FileName = "/data.dat";
+
+		private readonly ReadOnlyCollection<RecommendStyle> recommendStyle = Array.AsReadOnly<RecommendStyle>( new RecommendStyle[]
+		{
+			new RecommendStyle("Standard", new Style(13, StyleType.ObjectField)),
+			new RecommendStyle("Label", new Style(13, StyleType.Label)),
+			new RecommendStyle("Flat", new Style(0, StyleType.BoldLabel)),
+			new RecommendStyle("Flat Label", new Style(0, StyleType.Label)),
+			new RecommendStyle("Radio", new Style(13, StyleType.RadioButton))
+		});
 
 		[MenuItem("Window/AssetHistory")]
 		public static void ShowWindow()
@@ -102,7 +112,7 @@ namespace AssetHistory
         private void DrawHistory()
         {
 			var iconSize = EditorGUIUtility.GetIconSize();
-			EditorGUIUtility.SetIconSize(Vector2.one * CurrentData.iconSize);
+			EditorGUIUtility.SetIconSize(Vector2.one * CurrentData.style.iconSize);
 
 			EditorGUILayout.BeginVertical("box");
             historyScrollPosition = EditorGUILayout.BeginScrollView( historyScrollPosition );
@@ -226,20 +236,20 @@ namespace AssetHistory
 
 				EditorGUILayout.BeginHorizontal();
 				EditorGUILayout.LabelField("Icon size", GUILayout.Width(100));
-				var _iconSize = EditorGUILayout.IntSlider(CurrentData.iconSize, 0, 128);
-				if(_iconSize != CurrentData.iconSize)
+				var _iconSize = EditorGUILayout.IntSlider(CurrentData.style.iconSize, 0, 128);
+				if(_iconSize != CurrentData.style.iconSize)
 				{
-					CurrentData.iconSize = _iconSize;
+					CurrentData.style.iconSize = _iconSize;
 					Save();
 				}
 				EditorGUILayout.EndHorizontal();
 
 				EditorGUILayout.BeginHorizontal();
 				EditorGUILayout.LabelField("Style", GUILayout.Width(100));
-				var _style = (Style)EditorGUILayout.EnumPopup(CurrentData.historyStyle);
-				if(_style != CurrentData.historyStyle)
+				var _style = (StyleType)EditorGUILayout.EnumPopup(CurrentData.style.styleType);
+				if(_style != CurrentData.style.styleType)
 				{
-					CurrentData.historyStyle = _style;
+					CurrentData.style.styleType = _style;
 					Save();
 				}
 				EditorGUILayout.EndHorizontal();
@@ -247,35 +257,18 @@ namespace AssetHistory
 				EditorGUILayout.LabelField("Recommend style");
 				EditorGUILayout.BeginHorizontal();
 				EditorGUILayout.LabelField(" ", GUILayout.Width(115));
-				if(GUILayout.Button("Standard"))
+				for(int i=0; i<recommendStyle.Count; i++)
 				{
-					CurrentData.iconSize = 13;
-					CurrentData.historyStyle = Style.ObjectField;
-					Save();
-				}
-				if(GUILayout.Button("Label"))
-				{
-					CurrentData.iconSize = 13;
-					CurrentData.historyStyle = Style.Label;
-					Save();
-				}
-				if(GUILayout.Button("Flat"))
-				{
-					CurrentData.iconSize = 0;
-					CurrentData.historyStyle = Style.BoldLabel;
-					Save();
-				}
-				if(GUILayout.Button("Flat Label"))
-				{
-					CurrentData.iconSize = 0;
-					CurrentData.historyStyle = Style.Label;
-					Save();
+					if(GUILayout.Toggle(CurrentData.style.IsMatch(recommendStyle[i].style), recommendStyle[i].name, EditorStyles.toolbarButton))
+					{
+						CurrentData.style = new Style(recommendStyle[i].style);
+					}
 				}
 				EditorGUILayout.EndHorizontal();
 
 				EditorGUILayout.BeginHorizontal();
 				GUILayout.FlexibleSpace();
-				if(GUILayout.Button("Delete", GUILayout.Width(50)))
+				if(GUILayout.Button("Delete", EditorStyles.miniButton, GUILayout.Width(50)))
 				{
 					var message = string.Format("データを全て削除します。{0}本当によろしいですか？", System.Environment.NewLine);
 					if(EditorUtility.DisplayDialog("AssetHistory", message, "Yes", "No"))
@@ -317,9 +310,11 @@ namespace AssetHistory
 
 		private static void OnChangeSelected()
 		{
-            CurrentData.guids.RemoveAll( g => AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( g ), typeof( UnityEngine.Object ) ) == null );
-            CurrentData.accessCounts.RemoveAll( a => AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( a.guid ), typeof( UnityEngine.Object ) ) == null );
-            System.Array.ForEach( Selection.objects, o =>
+            CurrentData.guids.RemoveAll( IsRemove );
+			CurrentData.accessCounts.RemoveAll( a => IsRemove(a.guid) );
+			CurrentData.recently.RemoveAll( IsRemove );
+			CurrentData.category.ForEach( c => c.guids.RemoveAll( IsRemove ) );
+			System.Array.ForEach( Selection.objects, o =>
 			{
 				if(CanInsert(o))
 				{
@@ -426,6 +421,11 @@ namespace AssetHistory
 			content.tooltip = AssetDatabase.GetAssetPath(obj);
 
 			return content;
+		}
+
+		private static bool IsRemove(string guid)
+		{
+			return AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( guid ), typeof( UnityEngine.Object ) ) == null;
 		}
 	}
 }

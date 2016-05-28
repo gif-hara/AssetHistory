@@ -22,9 +22,7 @@ namespace AssetHistory
 
 		public int historyCount = 100;
 
-		public int iconSize = 16;
-
-		public Style historyStyle = Style.Label;
+		public Style style;
 
 		public void ChangeHistoryCount(int historyCount)
 		{
@@ -49,37 +47,37 @@ namespace AssetHistory
 			this.filters = new List<Filter>();
 			this.mode = Mode.History;
 			this.historyCount = 100;
-			this.iconSize = 16;
-			this.historyStyle = Style.Label;
+			this.style.iconSize = 13;
+			this.style.styleType = StyleType.ObjectField;
 		}
 
 		public GUIStyle GetStyle()
 		{
-			switch(this.historyStyle)
+			switch(this.style.styleType)
 			{
-			case Style.Label:
+			case StyleType.Label:
 				return EditorStyles.label;
-			case Style.LargeLabel:
+			case StyleType.LargeLabel:
 				return EditorStyles.largeLabel;
-			case Style.MiniLabel:
+			case StyleType.MiniLabel:
 				return EditorStyles.miniLabel;
-			case Style.BoldLabel:
+			case StyleType.BoldLabel:
 				return EditorStyles.boldLabel;
-			case Style.CenteredGreyMiniLabel:
+			case StyleType.CenteredGreyMiniLabel:
 				return EditorStyles.centeredGreyMiniLabel;
-			case Style.MiniButton:
+			case StyleType.MiniButton:
 				return EditorStyles.miniButton;
-			case Style.ToolbarButton:
+			case StyleType.ToolbarButton:
 				return EditorStyles.toolbarButton;
-			case Style.RadioButton:
+			case StyleType.RadioButton:
 				return EditorStyles.radioButton;
-			case Style.Toggle:
+			case StyleType.Toggle:
 				return EditorStyles.toggle;
-			case Style.ObjectField:
+			case StyleType.ObjectField:
 				return EditorStyles.objectField;
-			case Style.ObjectFieldThumb:
+			case StyleType.ObjectFieldThumb:
 				return EditorStyles.objectFieldThumb;
-			case Style.HelpBox:
+			case StyleType.HelpBox:
 				return EditorStyles.helpBox;
 			default:
 				return EditorStyles.label;
@@ -95,7 +93,7 @@ namespace AssetHistory
 		Category,
 	}
 
-	public enum Style : int
+	public enum StyleType : int
 	{
 		Label,
 		LargeLabel,
@@ -156,4 +154,43 @@ namespace AssetHistory
             this.valid = true;
         }
     }
+
+	[System.Serializable]
+	public class Style
+	{
+		public int iconSize = 13;
+
+		public StyleType styleType = StyleType.ObjectField;
+
+		public Style(int iconSize, StyleType styleType)
+		{
+			this.iconSize = iconSize;
+			this.styleType = styleType;
+		}
+
+		public Style(Style other)
+		{
+			this.iconSize = other.iconSize;
+			this.styleType = other.styleType;
+		}
+
+		public bool IsMatch(Style other)
+		{
+			return (this.iconSize == other.iconSize) && (this.styleType == other.styleType);
+		}
+	}
+
+	[System.Serializable]
+	public class RecommendStyle
+	{
+		public string name;
+
+		public Style style;
+
+		public RecommendStyle(string name, Style style)
+		{
+			this.name = name;
+			this.style = style;
+		}
+	}
 }
