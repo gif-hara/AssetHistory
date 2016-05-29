@@ -62,10 +62,17 @@ namespace AssetHistory
 		{
             LoadData();
 
+			EditorGUI.BeginChangeCheck();
+
             DrawHeader();
             DrawHistory();
             DrawFilter();
 			DrawOption();
+
+			if(EditorGUI.EndChangeCheck())
+			{
+				Save();
+			}
 		}
 
 		void OnInspectorUpdate()
@@ -103,7 +110,6 @@ namespace AssetHistory
 				if( GUILayout.Toggle( CurrentData.mode == (Mode)i, enumNames[i], EditorStyles.toolbarButton ) )
 				{
 					CurrentData.mode = (Mode)i;
-					Save();
 				}
 			}
 			EditorGUILayout.EndHorizontal();
@@ -118,60 +124,64 @@ namespace AssetHistory
             historyScrollPosition = EditorGUILayout.BeginScrollView( historyScrollPosition );
             if( CurrentData.mode == Mode.History )
 			{
-                CurrentData.guids.ForEach( g =>
+				for(int i=0, imax=CurrentData.guids.Count; i<imax; i++)
 				{
-                    var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( g ), typeof( UnityEngine.Object ) );
-                    if( CurrentData.filters.Find( f => f.name == obj.GetType().Name ).valid )
-                    {
-						DrawContent(obj);
-                    }
-				});
-            }
-			else if(CurrentData.mode == Mode.Access)
-			{
-                CurrentData.accessCounts.ForEach( a =>
-				{
-                    var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( a.guid ), typeof( UnityEngine.Object ) );
-                    if( CurrentData.filters.Find( f => f.name == obj.GetType().Name ).valid )
-                    {
-                        EditorGUILayout.BeginHorizontal();
-						GUILayout.Label( string.Format("{0}", a.accessCount), GUILayout.Width( 36 ) );
-						DrawContent(obj);
-                        EditorGUILayout.EndHorizontal();
-                    }
-				});
-            }
-			else if(CurrentData.mode == Mode.Recently)
-			{
-				CurrentData.recently.ForEach( r =>
-				{
-					var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( r ), typeof( UnityEngine.Object ) );
-					if( CurrentData.filters.Find( f => f.name == obj.GetType().Name ).valid )
+					var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( CurrentData.guids[i] ), typeof( UnityEngine.Object ) );
+					if( CurrentData.FilterDictionary[obj.GetType().Name].valid )
 					{
 						DrawContent(obj);
 					}
-				});
+				}
+            }
+			else if(CurrentData.mode == Mode.Access)
+			{
+				var accessCounts = CurrentData.accessCounts;
+				for(int i=0, imax=accessCounts.Count; i<imax; i++)
+				{
+					var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( accessCounts[i].guid ), typeof( UnityEngine.Object ) );
+					if( CurrentData.FilterDictionary[obj.GetType().Name].valid )
+					{
+						EditorGUILayout.BeginHorizontal();
+						GUILayout.Label( string.Format("{0}", accessCounts[i].accessCount ), GUILayout.Width( 36 ) );
+						DrawContent(obj);
+						EditorGUILayout.EndHorizontal();
+					}
+				}
+            }
+			else if(CurrentData.mode == Mode.Recently)
+			{
+				var recently = CurrentData.recently;
+				for(int i=0, imax=recently.Count; i<imax; i++)
+				{
+					var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( recently[i] ), typeof( UnityEngine.Object ) );
+					if( CurrentData.FilterDictionary[obj.GetType().Name].valid )
+					{
+						DrawContent(obj);
+					}
+				}
 			}
 			else if(CurrentData.mode == Mode.Category)
 			{
-				CurrentData.category.ForEach( c =>
+				var category = CurrentData.category;
+				for(int i=0, imax=category.Count; i<imax; i++)
 				{
-					if( CurrentData.filters.Find( f => f.name == c.filterName ).valid )
+					if( CurrentData.FilterDictionary[category[i].filterName].valid )
 					{
-						c.animBool.target = EditorGUILayout.Foldout( c.animBool.target, c.filterName );
-						if( EditorGUILayout.BeginFadeGroup( c.animBool.faded ) )
+						category[i].animBool.target = EditorGUILayout.Foldout( category[i].animBool.target, category[i].filterName );
+						if( EditorGUILayout.BeginFadeGroup( category[i].animBool.faded ) )
 						{
 							EditorGUI.indentLevel++;
-							c.guids.ForEach(g =>
+							var guids = category[i].guids;
+							for(int j=0, jmax=guids.Count; j<jmax; j++)
 							{
-								var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( g ), typeof( UnityEngine.Object ) );
-									DrawContent(obj);
-							});
+								var obj = AssetDatabase.LoadAssetAtPath( AssetDatabase.GUIDToAssetPath( guids[j] ), typeof( UnityEngine.Object ) );
+								DrawContent(obj);
+							}
 							EditorGUI.indentLevel--;
 						}
 						EditorGUILayout.EndFadeGroup();
 					}
-				});
+				}
 			}
             EditorGUILayout.EndScrollView();
 			EditorGUILayout.EndVertical();
@@ -194,16 +204,10 @@ namespace AssetHistory
                     {
                         CurrentData.filters[i].valid = allFilter;
                     }
-                    Save();
                 }
                 for( var i = 0; i < CurrentData.filters.Count; i++ )
                 {
-                    var oldValid = CurrentData.filters[i].valid;
 					CurrentData.filters[i].valid = EditorGUILayout.ToggleLeft( CurrentData.filters[i].name, CurrentData.filters[i].valid );
-                    if( oldValid != CurrentData.filters[i].valid )
-                    {
-                        Save();
-                    }
                 }
                 EditorGUI.indentLevel--;
 				EditorGUILayout.EndScrollView();
@@ -229,7 +233,6 @@ namespace AssetHistory
 					if(EditorUtility.DisplayDialog("AssetHistory", message, "Yes", "No"))
 					{
 						CurrentData.ChangeHistoryCount(_historyCount);
-						Save();
 					}
 				}
 				EditorGUILayout.EndHorizontal();
@@ -240,7 +243,6 @@ namespace AssetHistory
 				if(_iconSize != CurrentData.style.iconSize)
 				{
 					CurrentData.style.iconSize = _iconSize;
-					Save();
 				}
 				EditorGUILayout.EndHorizontal();
 
@@ -250,7 +252,6 @@ namespace AssetHistory
 				if(_style != CurrentData.style.styleType)
 				{
 					CurrentData.style.styleType = _style;
-					Save();
 				}
 				EditorGUILayout.EndHorizontal();
 
@@ -274,7 +275,6 @@ namespace AssetHistory
 					if(EditorUtility.DisplayDialog("AssetHistory", message, "Yes", "No"))
 					{
 						CurrentData.Reset();
-						Save();
 					}
 				}
 				EditorGUILayout.EndHorizontal();
@@ -364,12 +364,7 @@ namespace AssetHistory
 						return a.CompareTo(b);
 					});
 						
-
-                    if( CurrentData.filters.FindIndex( s => s.name == typeName ) < 0 )
-                    {
-                        CurrentData.filters.Add( new Filter( typeName ) );
-                        CurrentData.filters.Sort( ( a, b ) => a.name.CompareTo( b.name ) );
-                    }
+					CurrentData.AddFilter(typeName);
 				}
 			});
 
