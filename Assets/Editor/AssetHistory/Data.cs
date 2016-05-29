@@ -18,6 +18,24 @@ namespace AssetHistory
 
         public List<Filter> filters = new List<Filter>();
 
+		public Dictionary<string, Filter> FilterDictionary
+		{
+			get
+			{
+				if(this.filterDictionary == null)
+				{
+					this.filterDictionary = new Dictionary<string, Filter>();
+					for(int i=0, imax=this.filters.Count; i<imax; i++)
+					{
+						this.filterDictionary.Add(this.filters[i].name, this.filters[i]);
+					}
+				}
+
+				return this.filterDictionary;
+			}
+		}
+		private Dictionary<string, Filter> filterDictionary = null;
+
 		public Mode mode = Mode.History;
 
 		public int historyCount = 100;
@@ -45,10 +63,23 @@ namespace AssetHistory
 			this.recently = new List<string>();
 			this.category = new List<Category>();
 			this.filters = new List<Filter>();
+			this.filterDictionary = null;
 			this.mode = Mode.History;
 			this.historyCount = 100;
 			this.style.iconSize = 13;
 			this.style.styleType = StyleType.ObjectField;
+		}
+
+		public void AddFilter(string name)
+		{
+			if( this.FilterDictionary.ContainsKey( name ))
+			{
+				return;
+			}
+			var filter = new Filter( name );
+			this.filters.Add( filter );
+			this.filters.Sort( ( a, b ) => a.name.CompareTo( b.name ) );
+			this.filterDictionary.Add(name, filter);
 		}
 
 		public GUIStyle GetStyle()
